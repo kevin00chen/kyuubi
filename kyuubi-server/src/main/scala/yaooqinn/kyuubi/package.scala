@@ -69,7 +69,7 @@ package object kyuubi {
   val KYUUBI_VERSION = BuildInfo.kyuubi_version
   val SPARK_COMPILE_VERSION = BuildInfo.spark_version
   val BRANCH = BuildInfo.branch
-  val JAR_NAME = BuildInfo.kyuubi_jar
+  val KYUUBI_JAR_NAME = BuildInfo.kyuubi_jar
   val REVISION = BuildInfo.revision
   val BUILD_USER = BuildInfo.user
 

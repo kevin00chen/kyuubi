@@ -167,11 +167,11 @@ class KyuubiSparkUtilSuite extends SparkFunSuite with Logging {
   test("testGetContextClassLoader") {
     val origin = Thread.currentThread().getContextClassLoader
     try {
-      assert(KyuubiSparkUtil.getContextOrSparkClassLoader() === origin)
+      assert(KyuubiSparkUtil.getContextOrSparkClassLoader === origin)
 
       val classloader = new URLClassLoader(Seq.empty[URL], origin)
       Thread.currentThread().setContextClassLoader(classloader)
-      assert(KyuubiSparkUtil.getContextOrSparkClassLoader() === classloader)
+      assert(KyuubiSparkUtil.getContextOrSparkClassLoader === classloader)
     } finally {
       Thread.currentThread().setContextClassLoader(origin)
     }

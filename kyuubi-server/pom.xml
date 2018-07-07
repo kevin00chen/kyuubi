@@ -30,6 +30,12 @@
     <name>Kyuubi Server</name>
 
     <dependencies>
+
+        <dependency>
+            <groupId>${spark.group}</groupId>
+            <artifactId>spark-yarn_${scala.binary.version}</artifactId>
+        </dependency>
+
         <dependency>
             <groupId>${spark.group}</groupId>
             <artifactId>spark-hive_${scala.binary.version}</artifactId>

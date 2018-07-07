@@ -18,30 +18,23 @@
 package org.apache.spark.deploy
 
 import java.io.{File, PrintStream}
-import java.lang.reflect.{InvocationTargetException, Modifier, UndeclaredThrowableException}
 
-import scala.annotation.tailrec
 import scala.collection.mutable.{ArrayBuffer, HashMap, Map}
 import scala.util.Properties
 
 import org.apache.hadoop.security.UserGroupInformation
 import org.apache.spark._
-import org.apache.spark.util.{ChildFirstURLClassLoader, MutableURLClassLoader, Utils}
+import org.apache.spark.util.{MutableURLClassLoader, Utils}
+
+import yaooqinn.kyuubi.server.KyuubiServer
+import yaooqinn.kyuubi.yarn.KyuubiYarnClient
 
 /**
  * Kyuubi version of SparkSubmit
  */
 object KyuubiSubmit {
 
-  // Cluster managers
-  private val YARN = 1
-
-  // Deploy modes
-  private val CLIENT = 1
-  private val CLASS_NOT_FOUND_EXIT_STATUS = 101
-
   // scalastyle:off println
-  // Exposed for testing
   private[spark] var exitFn: Int => Unit = (exitCode: Int) => System.exit(exitCode)
   private[spark] var printStream: PrintStream = System.err
   private[spark] def printWarning(str: String): Unit = printStream.println("Warning: " + str)
@@ -76,21 +69,35 @@ object KyuubiSubmit {
       printStream.println(appArgs)
       // scalastyle:on println
     }
-    submit(appArgs)
-  }
+    val (childClasspath, sysProps) = prepareSubmitEnvironment(appArgs)
+    if (appArgs.verbose) {
+      // scalastyle:off println
+      // sysProps may contain sensitive information, so redact before printing
+      printStream.println(s"System properties:\n${Utils.redact(sysProps).mkString("\n")}")
+      printStream.println(s"Classpath elements:\n${childClasspath.mkString("\n")}")
+      printStream.println("\n")
+    }
+    // scalastyle:on println
 
-  /**
-   * Submit the application using the provided parameters.
-   *
-   * This runs in two steps. First, we prepare the launch environment by setting up
-   * the appropriate classpath, system properties, and application arguments for
-   * running the child main class based on the cluster manager and the deploy mode.
-   * Second, we use this launch environment to invoke the main method of the child
-   * main class.
-   */
-  private def submit(args: SparkSubmitArguments): Unit = {
-    val (childArgs, childClasspath, sysProps, childMainClass) = prepareSubmitEnvironment(args)
-    runMain(childArgs, childClasspath, sysProps, childMainClass, args.verbose)
+    val loader = KyuubiSparkUtil.getAndSetKyuubiFirstClassLoader
+
+    for (jar <- childClasspath) {
+      addJarToClasspath(jar, loader)
+    }
+
+    for ((key, value) <- sysProps) {
+      System.setProperty(key, value)
+    }
+
+    try {
+      if (appArgs.deployMode == "cluster") {
+        KyuubiYarnClient.main(null)
+      } else {
+        KyuubiServer.main(null)
+      }
+    } catch {
+      case t: Throwable => throw t
+    }
   }
 
   /**
@@ -103,12 +110,10 @@ object KyuubiSubmit {
    * Exposed for testing.
    */
   private[deploy] def prepareSubmitEnvironment(args: SparkSubmitArguments)
-  : (Seq[String], Seq[String], Map[String, String], String) = {
+  : (Seq[String], Map[String, String]) = {
     // Return values
-    val childArgs = new ArrayBuffer[String]()
     val childClasspath = new ArrayBuffer[String]()
     val sysProps = new HashMap[String, String]()
-    val childMainClass = args.mainClass
 
     args.master match {
       case "yarn" =>
@@ -121,6 +126,7 @@ object KyuubiSubmit {
 
     args.deployMode match {
       case "client" =>
+      case "cluster" =>
       case _ => printWarning("Kyuubi only supports client mode.")
         args.deployMode = "client"
 
@@ -156,7 +162,6 @@ object KyuubiSubmit {
 
     childClasspath += args.primaryResource
     if (args.jars != null) { childClasspath ++= args.jars.split(",") }
-    if (args.childArgs != null) { childArgs ++= args.childArgs }
     val jars = sysProps.get("spark.jars").map(x => x.split(",").toSeq).getOrElse(Seq.empty) ++
       Seq(args.primaryResource)
     sysProps.put("spark.jars", jars.mkString(","))
@@ -196,76 +201,15 @@ object KyuubiSubmit {
       }
     }
 
-    (childArgs, childClasspath, sysProps, childMainClass)
+    (childClasspath, sysProps)
   }
 
   private def runMain(
-      childArgs: Seq[String],
       childClasspath: Seq[String],
       sysProps: Map[String, String],
-      childMainClass: String,
       verbose: Boolean): Unit = {
     // scalastyle:off println
-    if (verbose) {
-      printStream.println(s"Main class:\n$childMainClass")
-      printStream.println(s"Arguments:\n${childArgs.mkString("\n")}")
-      // sysProps may contain sensitive information, so redact before printing
-      printStream.println(s"System properties:\n${Utils.redact(sysProps).mkString("\n")}")
-      printStream.println(s"Classpath elements:\n${childClasspath.mkString("\n")}")
-      printStream.println("\n")
-    }
-    // scalastyle:on println
 
-    val url = this.getClass.getProtectionDomain.getCodeSource.getLocation
-    val loader = new ChildFirstURLClassLoader(Array(url),
-      Thread.currentThread.getContextClassLoader)
-
-    Thread.currentThread.setContextClassLoader(loader)
-
-    for (jar <- childClasspath) {
-      addJarToClasspath(jar, loader)
-    }
-
-    for ((key, value) <- sysProps) {
-      System.setProperty(key, value)
-    }
-
-    var mainClass: Class[_] = null
-
-    try {
-      mainClass = Utils.classForName(childMainClass)
-    } catch {
-      case e: ClassNotFoundException =>
-        e.printStackTrace(printStream)
-        System.exit(CLASS_NOT_FOUND_EXIT_STATUS)
-    }
-
-    val mainMethod = mainClass.getMethod("main", new Array[String](0).getClass)
-    if (!Modifier.isStatic(mainMethod.getModifiers)) {
-      throw new IllegalStateException("The main method in the given main class must be static")
-    }
-
-    @tailrec
-    def findCause(t: Throwable): Throwable = t match {
-      case e: UndeclaredThrowableException =>
-        if (e.getCause != null) findCause(e.getCause) else e
-      case e: InvocationTargetException =>
-        if (e.getCause != null) findCause(e.getCause) else e
-      case e: Throwable =>
-        e
-    }
-
-    try {
-      mainMethod.invoke(null, childArgs.toArray)
-    } catch {
-      case t: Throwable =>
-        findCause(t) match {
-          case SparkUserAppException(exitCode) =>
-            System.exit(exitCode)
-          case t: Throwable =>
-            throw t
-        }
-    }
   }
 
   private def addJarToClasspath(localJar: String, loader: MutableURLClassLoader) {

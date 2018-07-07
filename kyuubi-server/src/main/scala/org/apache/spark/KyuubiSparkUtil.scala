@@ -18,12 +18,14 @@
 package org.apache.spark
 
 import java.io.File
+import java.net.URI
 
+import scala.collection.Map
 import scala.util.matching.Regex
 
 import org.apache.hadoop.conf.Configuration
 import org.apache.spark.deploy.SparkHadoopUtil
-import org.apache.spark.util.{ShutdownHookManager, Utils, VersionUtils}
+import org.apache.spark.util._
 import org.slf4j.Logger
 
 import yaooqinn.kyuubi.Logging
@@ -47,7 +49,13 @@ object KyuubiSparkUtil extends Logging {
 
   val KEYTAB = SPARK_PREFIX + YARN_PREFIX + "keytab"
   val PRINCIPAL = SPARK_PREFIX + YARN_PREFIX + "principal"
+  val CACHED_CONF_ARCHIVE = SPARK_PREFIX + YARN_PREFIX + ".cache.confArchive"
+  val MAX_APP_ATTEMPTS = SPARK_PREFIX + YARN_PREFIX + "maxAppAttempts"
+
   val DRIVER_BIND_ADDR = SPARK_PREFIX + DRIVER_PREFIX + "bindAddress"
+  val DRIVER_MEM = SPARK_PREFIX + DRIVER_PREFIX + "memory"
+  val DRIVER_CORES = SPARK_PREFIX + DRIVER_PREFIX + "cores"
+  val DRIVER_EXTRA_JAVA_OPTIONS = SPARK_PREFIX + DRIVER_PREFIX + "extraJavaOptions"
 
   val SPARK_UI_PORT = SPARK_PREFIX + UI_PREFIX + "port"
   val SPARK_UI_PORT_DEFAULT = "0"
@@ -95,13 +103,13 @@ object KyuubiSparkUtil extends Logging {
     Utils.getCurrentUserName()
   }
 
-  def getContextOrSparkClassLoader(): ClassLoader = {
+  def getContextOrSparkClassLoader: ClassLoader = {
     Utils.getContextOrSparkClassLoader
   }
 
   def createTempDir(
-      root: String = System.getProperty("java.io.tmpdir"),
-      namePrefix: String = "spark"): File = {
+                     root: String = System.getProperty("java.io.tmpdir"),
+                     namePrefix: String = "spark"): File = {
     Utils.createTempDir(root, namePrefix)
   }
 
@@ -134,5 +142,72 @@ object KyuubiSparkUtil extends Logging {
    */
   def timeStringAsMs(str: String): Long = {
     Utils.timeStringAsMs(str)
+  }
+
+  /**
+   * Return a well-formed URI for the file described by a user input string.
+   *
+   * If the supplied path does not contain a scheme, or is a relative path, it will be
+   * converted into an absolute path with a file:// scheme.
+   */
+  def resolveURI(path: String): URI = {
+    Utils.resolveURI(path)
+  }
+
+  def getLocalDir(conf: SparkConf): String = {
+    Utils.getLocalDir(conf)
+  }
+
+
+  /**
+   * Split a string of potentially quoted arguments from the command line the way that a shell
+   * would do it to determine arguments to a command. For example, if the string is 'a "b c" d',
+   * then it would be parsed as three arguments: 'a', 'b c' and 'd'.
+   */
+  def splitCommandString(s: String): Seq[String] = {
+    Utils.splitCommandString(s)
+  }
+
+  /**
+   * Replaces all the {{APP_ID}} occurrences with the App Id.
+   */
+  def substituteAppId(opt: String, appId: String): String = {
+    opt.replace("{{APP_ID}}", appId)
+  }
+
+  /**
+   * Escapes a string for inclusion in a command line executed by Yarn. Yarn executes commands
+   * using either
+   *
+   * (Unix-based) `bash -c "command arg1 arg2"` and that means plain quoting doesn't really work.
+   * The argument is enclosed in single quotes and some key characters are escaped.
+   *
+   * @param arg A single argument.
+   *
+   * @return Argument quoted for execution via Yarn's generated shell script.
+   */
+  def escapeForShell(arg: String): String = {
+    val escaped = new StringBuilder("'")
+    arg.foreach {
+      case '$' => escaped.append("\\$")
+      case '"' => escaped.append("\\\"")
+      case '\'' => escaped.append("'\\''")
+      case c => escaped.append(c)
+    }
+    escaped.append("'").toString()
+  }
+
+  /** Load properties present in the given file. */
+  def getPropertiesFromFile(filename: String): Map[String, String] = {
+    Utils.getPropertiesFromFile(filename)
+  }
+
+  def getAndSetKyuubiFirstClassLoader: MutableURLClassLoader = {
+    val url = this.getClass.getProtectionDomain.getCodeSource.getLocation
+    val loader = new ChildFirstURLClassLoader(
+      Array(url),
+      Thread.currentThread.getContextClassLoader)
+    Thread.currentThread.setContextClassLoader(loader)
+    loader
   }
 }
