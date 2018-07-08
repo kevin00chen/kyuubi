@@ -108,8 +108,8 @@ object KyuubiSparkUtil extends Logging {
   }
 
   def createTempDir(
-                     root: String = System.getProperty("java.io.tmpdir"),
-                     namePrefix: String = "spark"): File = {
+      root: String = System.getProperty("java.io.tmpdir"),
+      namePrefix: String = "spark"): File = {
     Utils.createTempDir(root, namePrefix)
   }
 
