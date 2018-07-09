@@ -73,7 +73,7 @@ class KyuubiServerSuite extends SparkFunSuite {
   }
 
   test("init KyuubiServer") {
-    val conf = new SparkConf(true)
+    val conf = new SparkConf(true).set(KyuubiConf.FRONTEND_BIND_PORT.key, "0")
     KyuubiServer.setupCommonConfig(conf)
     val server = new KyuubiServer()
     server.init(conf)
@@ -100,7 +100,8 @@ class KyuubiServerSuite extends SparkFunSuite {
     KyuubiConf.getAllDefaults.foreach { case (k, v) =>
         assert(conf.get(k) === v)
     }
-    assert(server.feService.getServerIPAddress.getHostName === KyuubiSparkUtil.localHostName)
+    assert(server.feService.getServiceState === State.STARTED)
+    assert(server.beService.getServiceState === State.STARTED)
     assert(server.feService.getPortNumber === 10009)
     server.stop()
   }
