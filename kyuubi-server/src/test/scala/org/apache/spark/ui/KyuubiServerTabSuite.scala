@@ -30,7 +30,7 @@ class KyuubiServerTabSuite extends SparkFunSuite {
   override def beforeAll(): Unit = {
     val conf = new SparkConf(loadDefaults = true).setMaster("local").setAppName("test")
     sc = new SparkContext(conf)
-    user = KyuubiSparkUtil.getCurrentUserName()
+    user = KyuubiSparkUtil.getCurrentUserName
     tab = new KyuubiServerTab(user, sc)
   }
 

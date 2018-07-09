@@ -89,7 +89,7 @@ class HighAvailabilityUtilsSuite extends SparkFunSuite with BeforeAndAfterEach {
 
   test("Add Server Instance To ZooKeeper with wrong host and right port") {
     server = new KyuubiServer()
-    conf.set(KyuubiConf.HA_ZOOKEEPER_QUORUM.key, "https://github.com")
+    conf.set(KyuubiConf.HA_ZOOKEEPER_QUORUM.key, "github.com")
     conf.set(KyuubiConf.HA_ZOOKEEPER_CLIENT_PORT.key, "2181")
     server.init(conf)
     server.start()

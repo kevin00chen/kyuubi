@@ -34,7 +34,7 @@ class KyuubiServerListenerSuite extends SparkFunSuite {
 
     val ip = KyuubiSparkUtil.localHostName()
     val sessionId = UUID.randomUUID().toString
-    val user = KyuubiSparkUtil.getCurrentUserName()
+    val user = KyuubiSparkUtil.getCurrentUserName
 
     li.onSessionCreated(ip, sessionId, user)
     assert(li.getSessionList.nonEmpty)
@@ -74,7 +74,7 @@ class KyuubiServerListenerSuite extends SparkFunSuite {
     assert(li.getTotalRunning === 0)
 
     val props = new Properties()
-    props.setProperty(KyuubiSparkUtil.getJobGroupIDKey(), groupId)
+    props.setProperty(KyuubiSparkUtil.getJobGroupIDKey, groupId)
     val jobStart = new SparkListenerJobStart(1, System.currentTimeMillis(), Seq.empty, props)
     li.onJobStart(jobStart)
 
