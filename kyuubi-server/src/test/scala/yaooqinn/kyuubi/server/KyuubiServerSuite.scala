@@ -22,7 +22,7 @@ import java.util.concurrent.atomic.AtomicBoolean
 
 import org.apache.hadoop.minikdc.MiniKdc
 import org.apache.hadoop.security.UserGroupInformation
-import org.apache.spark.{KyuubiSparkUtil, SparkConf, SparkFunSuite}
+import org.apache.spark.{KyuubiConf, KyuubiSparkUtil, SparkConf, SparkFunSuite}
 import org.apache.spark.deploy.SparkHadoopUtil
 
 import yaooqinn.kyuubi.service.{ServiceException, State}
@@ -91,6 +91,18 @@ class KyuubiServerSuite extends SparkFunSuite {
     server.stop()
     assert(server.getServiceState === State.STOPPED)
     assert(!ReflectUtils.getFieldValue(server, "started").asInstanceOf[AtomicBoolean].get)
+  }
+
+  test("start kyuubi server") {
+    val server = KyuubiServer.startKyuubiServer()
+    assert(server.getServiceState === State.STARTED)
+    val conf = server.getConf
+    KyuubiConf.getAllDefaults.foreach { case (k, v) =>
+        assert(conf.get(k) === v)
+    }
+    assert(server.feService.getServerIPAddress.getHostName === KyuubiSparkUtil.localHostName)
+    assert(server.feService.getPortNumber === 10009)
+    server.stop()
   }
 
   test("disable fs caches for secured cluster") {

@@ -52,6 +52,17 @@ class HighAvailabilityUtilsSuite extends SparkFunSuite with BeforeAndAfterEach {
     server.stop()
   }
 
+  test("start kyuubi server") {
+    conf.set(KyuubiConf.HA_ENABLED.key, "true")
+    conf.getAll.foreach { case (k, v) =>
+      sys.props(k) = v
+    }
+    server = KyuubiServer.startKyuubiServer()
+    val conf1 = server.getConf
+    assert(conf1.get(KyuubiConf.HA_ZOOKEEPER_QUORUM.key) === connectString)
+    assert(HighAvailabilityUtils.isSupportDynamicServiceDiscovery(conf1))
+  }
+
   test("Add Server Instance To ZooKeeper with host:port") {
     server = new KyuubiServer()
     server.init(conf)

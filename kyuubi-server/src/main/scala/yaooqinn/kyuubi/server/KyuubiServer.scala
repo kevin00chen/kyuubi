@@ -24,7 +24,7 @@ import org.apache.spark.{KyuubiConf, KyuubiSparkUtil, SparkConf}
 
 import yaooqinn.kyuubi._
 import yaooqinn.kyuubi.ha.HighAvailabilityUtils
-import yaooqinn.kyuubi.service.{CompositeService, ServiceException, ServiceUtils}
+import yaooqinn.kyuubi.service.{CompositeService, ServiceException}
 
 /**
  * Main entrance of Kyuubi Server

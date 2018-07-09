@@ -243,6 +243,12 @@ class KyuubiSparkUtilSuite extends SparkFunSuite with Logging {
     val cmd = "bash -c \"command arg1 arg2\""
     val escaped = KyuubiSparkUtil.escapeForShell(cmd)
     assert(escaped === "'bash -c \\\"command arg1 arg2\\\"'")
+    val cmd2 = "bash -c \"command $1 arg1 arg2\""
+    val escaped2 = KyuubiSparkUtil.escapeForShell(cmd2)
+    assert(escaped2 === "'bash -c \\\"command \\$1 arg1 arg2\\\"'")
+    val cmd3 = "bash -c \"command \' arg1 arg2\""
+    val escaped3 = KyuubiSparkUtil.escapeForShell(cmd3)
+    assert(escaped3 === "'bash -c \\\"command '\\'' arg1 arg2\\\"'")
   }
 
   test("get properties from file") {
