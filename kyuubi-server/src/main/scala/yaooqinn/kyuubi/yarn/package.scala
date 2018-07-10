@@ -25,9 +25,9 @@ import org.apache.hadoop.yarn.api.records.LocalResource
 package object yarn {
 
   type ENV = HashMap[String, String]
-
   type RESOURCES = HashMap[String, LocalResource]
 
+  val KYUUBI_YARN_APP_NAME = "KYUUBI SERVER"
   // Staging directory for any temporary jars or files
   val KYUUBI_STAGING: String = ".kyuubiStaging"
   // Staging directory is private! -> rwx--------

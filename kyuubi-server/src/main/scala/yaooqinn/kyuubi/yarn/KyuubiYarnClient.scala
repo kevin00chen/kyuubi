@@ -158,10 +158,10 @@ private[kyuubi] class KyuubiYarnClient(conf: SparkConf) extends Logging {
       app: YarnClientApplication,
       containerContext: ContainerLaunchContext): ApplicationSubmissionContext = {
     val appContext = app.getApplicationSubmissionContext
-    appContext.setApplicationName(conf.get("spark.app.name", "Spark"))
-    appContext.setQueue(conf.get(KyuubiSparkUtil.QUEUE))
+    appContext.setApplicationName(KYUUBI_YARN_APP_NAME)
+    appContext.setQueue(conf.get(KyuubiSparkUtil.QUEUE, YarnConfiguration.DEFAULT_QUEUE_NAME))
     appContext.setAMContainerSpec(containerContext)
-    appContext.setApplicationType("SPARK")
+    appContext.setApplicationType(KYUUBI_YARN_APP_NAME)
     conf.getOption(KyuubiSparkUtil.MAX_APP_ATTEMPTS) match {
       case Some(v) => appContext.setMaxAppAttempts(v.toInt)
       case None => debug(s"${KyuubiSparkUtil.MAX_APP_ATTEMPTS} is not set. " +
