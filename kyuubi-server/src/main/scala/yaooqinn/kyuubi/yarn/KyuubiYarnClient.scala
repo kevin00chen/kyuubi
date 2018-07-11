@@ -451,7 +451,7 @@ private[kyuubi] class KyuubiYarnClient(conf: SparkConf) extends Logging {
       conf: Configuration, sparkConf: SparkConf, env: ENV): Unit = {
     addClasspathEntry(Environment.PWD.$$(), env)
     addClasspathEntry(Environment.PWD.$$() + Path.SEPARATOR + SPARK_CONF_DIR, env)
-    addClasspathEntry(buildPath(Environment.PWD.$$(), KYUUBI_JAR_NAME), env)
+    addClasspathEntry(buildPath(Environment.PWD.$$(), new File(kyuubiJar).getName), env)
     addClasspathEntry(buildPath(Environment.PWD.$$(), SPARK_LIB_DIR, "*"), env)
     populateHadoopClasspath(conf, env)
   }

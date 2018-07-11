@@ -28,24 +28,24 @@ class AbstractServiceSuite extends SparkFunSuite {
     assert(service.getConf === null)
     assert(service.getStartTime === 0L)
     assert(service.getName === serviceName)
+    intercept[IllegalStateException](service.start())
+
     service.stop()
     assert(service.getServiceState === State.NOT_INITED)
     val conf = new SparkConf()
     service.init(conf)
     assert(service.getConf === conf)
-    assert(service.getStartTime === 0L)
+    assert(service.getStartTime !== 0L)
     assert(service.getServiceState === State.INITED)
     service.stop()
     assert(service.getServiceState === State.INITED)
     service.start()
     assert(service.getStartTime !== 0L)
-
     assert(service.getServiceState === State.STARTED)
     service.stop()
     assert(service.getServiceState === State.STOPPED)
     service.stop()
     assert(service.getServiceState === State.STOPPED)
-    intercept[IllegalStateException](service.ensureCurrentState(State.STARTED))
   }
 }
 
