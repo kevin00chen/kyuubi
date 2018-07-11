@@ -94,7 +94,7 @@ abstract class AbstractService(name: String) extends Service with Logging {
    *
    * @throws IllegalStateException if the service state is different from the desired state
    */
-  private def ensureCurrentState(currentState: State.Value): Unit = {
+  private[service] def ensureCurrentState(currentState: State.Value): Unit = {
     if (state ne currentState) {
       throw new IllegalStateException(
         s"""

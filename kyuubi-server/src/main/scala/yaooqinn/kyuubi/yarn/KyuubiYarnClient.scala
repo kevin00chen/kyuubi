@@ -55,7 +55,7 @@ private[kyuubi] class KyuubiYarnClient(conf: SparkConf) extends Logging {
   private[this] val kyuubiJar = System.getenv("KYUUBI_JAR")
   private[this] val memory = conf.getSizeAsMb(KyuubiSparkUtil.DRIVER_MEM, "1024m").toInt
   private[this] val memoryOverhead =
-    conf.getSizeAsMb(KyuubiSparkUtil.DRIVER_MEM_OVERHEAD, memory * 0.1 + "m").toInt
+    conf.getSizeAsMb(KyuubiSparkUtil.DRIVER_MEM_OVERHEAD, (memory * 0.1).toInt + "m").toInt
   private[this] val cores = conf.getInt(KyuubiSparkUtil.DRIVER_CORES, 1)
   private[this] val principal = conf.get(KyuubiSparkUtil.PRINCIPAL, "")
   private[this] val keytabOrigin = conf.get(KyuubiSparkUtil.KEYTAB, "")
