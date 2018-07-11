@@ -26,13 +26,14 @@ import org.apache.hadoop.security.UserGroupInformation
 import org.apache.spark._
 import org.apache.spark.util.{MutableURLClassLoader, Utils}
 
+import yaooqinn.kyuubi.Logging
 import yaooqinn.kyuubi.server.KyuubiServer
 import yaooqinn.kyuubi.yarn.KyuubiYarnClient
 
 /**
  * Kyuubi version of SparkSubmit
  */
-object KyuubiSubmit {
+object KyuubiSubmit extends Logging {
 
   // scalastyle:off println
   private[spark] var exitFn: Int => Unit = (exitCode: Int) => System.exit(exitCode)
@@ -91,12 +92,13 @@ object KyuubiSubmit {
 
     try {
       if (appArgs.deployMode == "cluster") {
-        KyuubiYarnClient.main(null)
+        KyuubiYarnClient.run()
       } else {
-        KyuubiServer.main(null)
+        KyuubiServer.startKyuubiServer()
       }
     } catch {
-      case t: Throwable => throw t
+      case t: Throwable =>
+        printErrorAndExit(s"Starting Kyuubi by ${appArgs.deployMode} " + t)
     }
   }
 

@@ -145,9 +145,4 @@ class KyuubiServerSuite extends SparkFunSuite {
     UserGroupInformation.setConfiguration(SparkHadoopUtil.get.newConfiguration(conf))
     assert(!UserGroupInformation.isSecurityEnabled)
   }
-
-  test("main") {
-    sys.props(KyuubiConf.FRONTEND_BIND_PORT.key) = "0"
-    KyuubiServer.main(null)
-  }
 }

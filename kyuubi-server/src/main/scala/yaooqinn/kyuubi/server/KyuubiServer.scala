@@ -67,30 +67,24 @@ private[kyuubi] class KyuubiServer private(name: String)
 
 object KyuubiServer extends Logging {
 
-  def main(args: Array[String]): Unit = {
+  def startKyuubiServer(): KyuubiServer = {
     try {
-      startKyuubiServer()
+      KyuubiSparkUtil.initDaemon(logger)
+      validate()
+      val conf = new SparkConf(loadDefaults = true)
+      setupCommonConfig(conf)
+      val server = new KyuubiServer()
+      server.init(conf)
+      server.start()
+      info(server.getName + " started!")
+      if (HighAvailabilityUtils.isSupportDynamicServiceDiscovery(conf)) {
+        info(s"HA mode: start to add this ${server.getName} instance to Zookeeper...")
+        HighAvailabilityUtils.addServerInstanceToZooKeeper(server)
+      }
+      server
     } catch {
-      case e: Exception =>
-        error("Error starting Kyuubi Server", e)
-        System.exit(-1)
+      case e: Exception => throw e
     }
-  }
-
-  private[kyuubi] def startKyuubiServer(): KyuubiServer = {
-    KyuubiSparkUtil.initDaemon(logger)
-    validate()
-    val conf = new SparkConf(loadDefaults = true)
-    setupCommonConfig(conf)
-    val server = new KyuubiServer()
-    server.init(conf)
-    server.start()
-    info(server.getName + " started!")
-    if (HighAvailabilityUtils.isSupportDynamicServiceDiscovery(conf)) {
-      info(s"HA mode: start to add this ${server.getName} instance to Zookeeper...")
-      HighAvailabilityUtils.addServerInstanceToZooKeeper(server)
-    }
-    server
   }
 
   /**

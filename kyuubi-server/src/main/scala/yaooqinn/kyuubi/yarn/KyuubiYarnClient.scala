@@ -488,7 +488,7 @@ private[kyuubi] class KyuubiYarnClient(conf: SparkConf) extends Logging {
 
 object KyuubiYarnClient {
 
-  def main(args: Array[String]): Unit = {
+  def run(): Unit = {
     val conf = new SparkConf()
     new KyuubiYarnClient(conf).submit()
   }
