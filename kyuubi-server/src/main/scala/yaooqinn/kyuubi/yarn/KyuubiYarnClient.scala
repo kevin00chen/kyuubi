@@ -158,20 +158,18 @@ private[kyuubi] class KyuubiYarnClient(conf: SparkConf) extends Logging {
       app: YarnClientApplication,
       containerContext: ContainerLaunchContext): ApplicationSubmissionContext = {
     val appContext = app.getApplicationSubmissionContext
-    appContext.setApplicationName(KYUUBI_YARN_APP_NAME)
+    appContext.setApplicationName(s"$KYUUBI_YARN_APP_NAME[$KYUUBI_VERSION]")
     appContext.setQueue(conf.get(KyuubiSparkUtil.QUEUE, YarnConfiguration.DEFAULT_QUEUE_NAME))
     appContext.setAMContainerSpec(containerContext)
-    appContext.setApplicationType(KYUUBI_YARN_APP_NAME)
+    appContext.setApplicationType(s"$KYUUBI_YARN_APP_NAME[${KyuubiSparkUtil.SPARK_VERSION}]")
     conf.getOption(KyuubiSparkUtil.MAX_APP_ATTEMPTS) match {
       case Some(v) => appContext.setMaxAppAttempts(v.toInt)
       case None => debug(s"${KyuubiSparkUtil.MAX_APP_ATTEMPTS} is not set. " +
         "Cluster's default value will be used.")
     }
-
     val capability = Records.newRecord(classOf[Resource])
     capability.setMemory(memory.toInt)
     capability.setVirtualCores(cores)
-
     appContext.setResource(capability)
     appContext
   }
@@ -235,7 +233,7 @@ private[kyuubi] class KyuubiYarnClient(conf: SparkConf) extends Logging {
     }
 
     if (loginFromKeytab) {
-      distribute(keytabOrigin, destName = Some(keytabForAM))
+      distribute(keytabOrigin, destName = Option(keytabForAM))
     }
 
     // Add KYUUBI jar to the cache

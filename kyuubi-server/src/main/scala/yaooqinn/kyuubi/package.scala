@@ -22,18 +22,8 @@ import java.util.Properties
 import yaooqinn.kyuubi.service.ServiceException
 
 package object kyuubi {
-
   private object BuildInfo extends Logging {
-
-    val (
-      kyuubi_version,
-      spark_version,
-      branch,
-      kyuubi_jar,
-      revision,
-      user,
-      repo_url,
-      build_date) = {
+    val (version, spark_version, branch, jar, revision, user, repo_url, build_date) = {
       val buildFile = "kyuubi-version-info.properties"
       Option(Thread.currentThread().getContextClassLoader.getResourceAsStream(buildFile)) match {
         case Some(res) =>
@@ -60,19 +50,17 @@ package object kyuubi {
               case e: Exception => throw new ServiceException(e)
             }
           }
-
         case _ => throw new ServiceException(s"Could not find $buildFile")
       }
     }
   }
 
-  val KYUUBI_VERSION = BuildInfo.kyuubi_version
-  val SPARK_COMPILE_VERSION = BuildInfo.spark_version
-  val BRANCH = BuildInfo.branch
-  val KYUUBI_JAR_NAME = BuildInfo.kyuubi_jar
-  val REVISION = BuildInfo.revision
-  val BUILD_USER = BuildInfo.user
-
-  val REPO_URL = BuildInfo.repo_url
-  val BUILD_DATE = BuildInfo.build_date
+  val KYUUBI_VERSION: String = BuildInfo.version
+  val SPARK_COMPILE_VERSION: String = BuildInfo.spark_version
+  val BRANCH: String = BuildInfo.branch
+  val KYUUBI_JAR_NAME: String = BuildInfo.jar
+  val REVISION: String = BuildInfo.revision
+  val BUILD_USER: String = BuildInfo.user
+  val REPO_URL: String = BuildInfo.repo_url
+  val BUILD_DATE: String = BuildInfo.build_date
 }

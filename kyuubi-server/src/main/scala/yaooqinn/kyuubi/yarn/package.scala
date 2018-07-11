@@ -31,9 +31,11 @@ package object yarn {
   // Staging directory for any temporary jars or files
   val KYUUBI_STAGING: String = ".kyuubiStaging"
   // Staging directory is private! -> rwx--------
-  val STAGING_DIR_PERMISSION = FsPermission.createImmutable(Integer.parseInt("700", 8).toShort)
+  val STAGING_DIR_PERMISSION: FsPermission =
+    FsPermission.createImmutable(Integer.parseInt("700", 8).toShort)
   // App files are world-wide readable and owner writable -> rw-r--r--
-  val APP_FILE_PERMISSION = FsPermission.createImmutable(Integer.parseInt("644", 8).toShort)
+  val APP_FILE_PERMISSION: FsPermission =
+    FsPermission.createImmutable(Integer.parseInt("644", 8).toShort)
 
   val SPARK_CONF_DIR = "__spark_conf__"
   val SPARK_CONF_FILE = "__spark_conf__.properties"
@@ -41,8 +43,7 @@ package object yarn {
   val HADOOP_CONF_DIR = "__hadoop_conf__"
   val SPARK_HADOOP_CONF_FILE = "__spark_hadoop_conf__.xml"
   // File containing the conf archive in the AM. See prepareLocalResources().
-  val SPARK_CONF_ARCHIVE = SPARK_CONF_DIR + ".zip"
+  val SPARK_CONF_ARCHIVE: String = SPARK_CONF_DIR + ".zip"
   val SPARK_LIB_DIR = "__spark_libs__"
   val LOCAL_SCHEME = "local"
-
 }
