@@ -44,16 +44,20 @@ object KyuubiSparkUtil extends Logging {
   private[this] val SQL_PREFIX = "sql."
   private[this] val HIVE_PREFIX = "hive."
 
+  // ENVIRONMENTS
   val SPARK_HOME: String = System.getenv("SPARK_HOME")
   val SPARK_JARS_DIR: String = SPARK_HOME + File.separator + "jars"
 
+  // YARN
   val KEYTAB: String = SPARK_PREFIX + YARN_PREFIX + "keytab"
   val PRINCIPAL: String = SPARK_PREFIX + YARN_PREFIX + "principal"
   val CACHED_CONF_ARCHIVE: String = SPARK_PREFIX + YARN_PREFIX + ".cache.confArchive"
   val MAX_APP_ATTEMPTS: String = SPARK_PREFIX + YARN_PREFIX + "maxAppAttempts"
 
+  // DRIVER
   val DRIVER_BIND_ADDR: String = SPARK_PREFIX + DRIVER_PREFIX + "bindAddress"
   val DRIVER_MEM: String = SPARK_PREFIX + DRIVER_PREFIX + "memory"
+  val DRIVER_MEM_OVERHEAD: String = SPARK_PREFIX + YARN_PREFIX + DRIVER_PREFIX + "memoryOverhead"
   val DRIVER_CORES: String = SPARK_PREFIX + DRIVER_PREFIX + "cores"
   val DRIVER_EXTRA_JAVA_OPTIONS: String = SPARK_PREFIX + DRIVER_PREFIX + "extraJavaOptions"
 
@@ -213,6 +217,9 @@ object KyuubiSparkUtil extends Logging {
     Utils.getPropertiesFromFile(filename)
   }
 
+  /**
+   * Get and set Kyuubi Jar First ClassLoader
+   */
   def getAndSetKyuubiFirstClassLoader: MutableURLClassLoader = {
     val url = this.getClass.getProtectionDomain.getCodeSource.getLocation
     val loader = new ChildFirstURLClassLoader(

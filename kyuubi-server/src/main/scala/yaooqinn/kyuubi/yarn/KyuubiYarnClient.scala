@@ -46,14 +46,16 @@ import org.apache.spark.deploy.yarn.KyuubiDistributedCacheManager
 import yaooqinn.kyuubi.{Logging, _}
 
 private[kyuubi] class KyuubiYarnClient(conf: SparkConf) extends Logging {
-
   private[this] val hadoopConf = new YarnConfiguration(KyuubiSparkUtil.newConfiguration(conf))
+
   private[this] val yarnClient = YarnClient.createYarnClient()
   yarnClient.init(hadoopConf)
   yarnClient.start()
 
   private[this] val kyuubiJar = System.getenv("KYUUBI_JAR")
-  private[this] val memory = conf.getSizeAsBytes(KyuubiSparkUtil.DRIVER_MEM, "1024m")
+  private[this] val memory = conf.getSizeAsMb(KyuubiSparkUtil.DRIVER_MEM, "1024m").toInt
+  private[this] val memoryOverhead =
+    conf.getSizeAsMb(KyuubiSparkUtil.DRIVER_MEM_OVERHEAD, memory * 0.1 + "m").toInt
   private[this] val cores = conf.getInt(KyuubiSparkUtil.DRIVER_CORES, 1)
   private[this] val principal = conf.get(KyuubiSparkUtil.PRINCIPAL, "")
   private[this] val keytabOrigin = conf.get(KyuubiSparkUtil.KEYTAB, "")
@@ -168,7 +170,7 @@ private[kyuubi] class KyuubiYarnClient(conf: SparkConf) extends Logging {
         "Cluster's default value will be used.")
     }
     val capability = Records.newRecord(classOf[Resource])
-    capability.setMemory(memory.toInt)
+    capability.setMemory(memory + memoryOverhead)
     capability.setVirtualCores(cores)
     appContext.setResource(capability)
     appContext
