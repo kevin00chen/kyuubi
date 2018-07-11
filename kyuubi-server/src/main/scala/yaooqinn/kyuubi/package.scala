@@ -19,48 +19,44 @@ package yaooqinn
 
 import java.util.Properties
 
+import scala.util.Try
+
 import yaooqinn.kyuubi.service.ServiceException
 
 package object kyuubi {
   private object BuildInfo extends Logging {
-    val (version, spark_version, branch, jar, revision, user, repo_url, build_date) = {
-      val buildFile = "kyuubi-version-info.properties"
-      Option(Thread.currentThread().getContextClassLoader.getResourceAsStream(buildFile)) match {
-        case Some(res) =>
-          try {
-            val unknown = "<unknown>"
-            val props = new Properties()
-            props.load(res)
-            (
-              props.getProperty("kyuubi_version", unknown),
-              props.getProperty("spark_version", unknown),
-              props.getProperty("branch", unknown),
-              props.getProperty("kyuubi_jar", unknown),
-              props.getProperty("revision", unknown),
-              props.getProperty("user", unknown),
-              props.getProperty("url", unknown),
-              props.getProperty("date", unknown)
-            )
-          } catch {
-            case e: Exception => throw new ServiceException(e)
-          } finally {
-            try {
-              res.close()
-            } catch {
-              case e: Exception => throw new ServiceException(e)
-            }
-          }
-        case _ => throw new ServiceException(s"Could not find $buildFile")
+    private val buildFile = "kyuubi-version-info.properties"
+    private val buildFileStream =
+      Thread.currentThread().getContextClassLoader.getResourceAsStream(buildFile)
+    private val unknown = "<unknown>"
+    private val props = new Properties()
+
+    if (buildFileStream != null) {
+      try {
+        props.load(buildFileStream)
+      } catch {
+        case e: Exception => throw new ServiceException(e)
+      } finally {
+        Try(buildFileStream.close())
       }
     }
+
+    val version: String = props.getProperty("kyuubi_version", unknown)
+    val sparkVersion: String = props.getProperty("spark_version", unknown)
+    val branch: String = props.getProperty("branch", unknown)
+    val jar: String = props.getProperty("jar", unknown)
+    val revision: String = props.getProperty("revision", unknown)
+    val user: String = props.getProperty("user", unknown)
+    val repoUrl: String = props.getProperty("url", unknown)
+    val buildDate: String = props.getProperty("date", unknown)
   }
 
   val KYUUBI_VERSION: String = BuildInfo.version
-  val SPARK_COMPILE_VERSION: String = BuildInfo.spark_version
+  val SPARK_COMPILE_VERSION: String = BuildInfo.sparkVersion
   val BRANCH: String = BuildInfo.branch
   val KYUUBI_JAR_NAME: String = BuildInfo.jar
   val REVISION: String = BuildInfo.revision
   val BUILD_USER: String = BuildInfo.user
-  val REPO_URL: String = BuildInfo.repo_url
-  val BUILD_DATE: String = BuildInfo.build_date
+  val REPO_URL: String = BuildInfo.repoUrl
+  val BUILD_DATE: String = BuildInfo.buildDate
 }
