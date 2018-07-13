@@ -31,11 +31,10 @@ import org.apache.spark.deploy.SparkHadoopUtil
 import org.apache.thrift.protocol.TBinaryProtocol
 import org.apache.thrift.transport.TSocket
 
-import yaooqinn.kyuubi.Logging
 import yaooqinn.kyuubi.auth.KerberosSaslHelper.CLIServiceProcessorFactory
 import yaooqinn.kyuubi.utils.ReflectUtils
 
-class KerberosTest extends SparkFunSuite with Logging {
+class KerberosTest extends SparkFunSuite {
 
   val krb5Conf = "java.security.krb5.conf"
   val hadoopAuth = "spark.hadoop.hadoop.security.authentication"
@@ -61,7 +60,6 @@ class KerberosTest extends SparkFunSuite with Logging {
         throw new AssertionError("unable to create temporary directory: " + e.getMessage)
     }
     val krb5Path = kdc.getKrb5conf.getAbsolutePath
-    info(krb5Path)
     System.setProperty(krb5Conf, krb5Path)
     conf = new SparkConf()
     conf.set(KyuubiConf.AUTHENTICATION_METHOD.key, kerberos)
@@ -71,8 +69,8 @@ class KerberosTest extends SparkFunSuite with Logging {
   override def afterAll() {
     super.afterAll()
     conf.remove(hadoopAuth)
+    System.clearProperty(krb5Conf)
     UserGroupInformation.setConfiguration(KyuubiSparkUtil.newConfiguration(conf))
-
     if (kdc != null) {
       kdc.stop()
     }
