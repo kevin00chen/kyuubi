@@ -40,7 +40,7 @@ import yaooqinn.kyuubi.service.AbstractService
 class KyuubiAppMaster private(args: AppMasterArguments, name: String) extends AbstractService(name)
   with Logging {
 
-  def this(args: AppMasterArguments) = this(args, classOf[KyuubiAppMaster].getName)
+  def this(args: AppMasterArguments) = this(args, classOf[KyuubiAppMaster].getSimpleName)
   private lazy val amClient = AMRMClient.createAMRMClient()
 
   private[this] var yarnConf: YarnConfiguration = _

@@ -45,7 +45,9 @@ import org.apache.spark.deploy.yarn.KyuubiDistributedCacheManager
 
 import yaooqinn.kyuubi.{Logging, _}
 
-private[kyuubi] class KyuubiYarnClient(conf: SparkConf) extends Logging {
+private[yarn] class KyuubiYarnClient(conf: SparkConf) extends Logging {
+  import KyuubiYarnClient._
+
   private[this] val hadoopConf = new YarnConfiguration(KyuubiSparkUtil.newConfiguration(conf))
 
   private[this] val yarnClient = YarnClient.createYarnClient()
@@ -178,7 +180,7 @@ private[kyuubi] class KyuubiYarnClient(conf: SparkConf) extends Logging {
   /**
    * Set up the environment for launching our AM container runs Kyuubi Server.
    */
-  private def setupLaunchEnv(): ENV = {
+  private[this] def setupLaunchEnv(): ENV = {
     info("Setting up the launch environment for our Kyuubi Server container")
     val env = new ENV
     populateClasspath(hadoopConf, conf, env)
@@ -209,28 +211,22 @@ private[kyuubi] class KyuubiYarnClient(conf: SparkConf) extends Logging {
      * @param resType Type of resource being distributed.
      * @param destName Name of the file in the distributed cache.
      * @param targetDir Subdirectory where to place the file.
-     * @return A 2-tuple. First item is whether the file is a "local:" URI. Second item is the
-     *         localized path for non-local paths, or the input `path` for local paths.
-     *         The localized path will be null if the URI has already been added to the cache.
      */
     def distribute(
         path: String,
         resType: LocalResourceType = LocalResourceType.FILE,
         destName: Option[String] = None,
-        targetDir: Option[String] = None): (Boolean, String) = {
+        targetDir: Option[String] = None): Unit = {
       val trimmedPath = path.trim()
       val localURI = KyuubiSparkUtil.resolveURI(trimmedPath)
       if (localURI.getScheme != LOCAL_SCHEME) {
         val localPath = getQualifiedLocalPath(localURI, hadoopConf)
-        val linkname = targetDir.map(_ + "/").getOrElse("") +
+        val linkName = targetDir.map(_ + "/").getOrElse("") +
           destName.orElse(Option(localURI.getFragment)).getOrElse(localPath.getName)
         val destPath = copyFileToRemote(appStagingDir, localPath, symlinkCache)
         val destFs = FileSystem.get(destPath.toUri, hadoopConf)
         KyuubiDistributedCacheManager.addResource(
-          destFs, hadoopConf, destPath, localResources, resType, linkname, statCache)
-        (false, linkname)
-      } else {
-        (true, trimmedPath)
+          destFs, hadoopConf, destPath, localResources, resType, linkName, statCache)
       }
     }
 
@@ -418,7 +414,9 @@ private[kyuubi] class KyuubiYarnClient(conf: SparkConf) extends Logging {
     })
     new Path(resolvedDestDir, qualifiedDestPath.getName)
   }
+}
 
+object KyuubiYarnClient {
   /**
    * Joins all the path components using [[Path.SEPARATOR]].
    */
@@ -451,7 +449,7 @@ private[kyuubi] class KyuubiYarnClient(conf: SparkConf) extends Logging {
       conf: Configuration, sparkConf: SparkConf, env: ENV): Unit = {
     addClasspathEntry(Environment.PWD.$$(), env)
     addClasspathEntry(Environment.PWD.$$() + Path.SEPARATOR + SPARK_CONF_DIR, env)
-    addClasspathEntry(buildPath(Environment.PWD.$$(), new File(kyuubiJar).getName), env)
+    addClasspathEntry(buildPath(Environment.PWD.$$(), KYUUBI_JAR_NAME), env)
     addClasspathEntry(buildPath(Environment.PWD.$$(), SPARK_LIB_DIR, "*"), env)
     populateHadoopClasspath(conf, env)
   }
@@ -484,9 +482,7 @@ private[kyuubi] class KyuubiYarnClient(conf: SparkConf) extends Logging {
 
   private[yarn] def getDefaultMRApplicationClasspath: Seq[String] =
     StringUtils.getStrings(MRJobConfig.DEFAULT_MAPREDUCE_APPLICATION_CLASSPATH).toSeq
-}
 
-object KyuubiYarnClient {
 
   def run(): Unit = {
     val conf = new SparkConf()
