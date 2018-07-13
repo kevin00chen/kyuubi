@@ -135,6 +135,7 @@ class KyuubiServerSuite extends SparkFunSuite with BeforeAndAfterEach {
       case e: IOException =>
         throw new AssertionError("unable to create temporary directory: " + e.getMessage)
     }
+
     assert(!UserGroupInformation.isSecurityEnabled)
     val conf = new SparkConf(true)
     val authType = "spark.hadoop.hadoop.security.authentication"
@@ -148,6 +149,9 @@ class KyuubiServerSuite extends SparkFunSuite with BeforeAndAfterEach {
     assert(conf.get(KyuubiSparkUtil.HDFS_CLIENT_CACHE) === "true")
     assert(conf.get(KyuubiSparkUtil.HDFS_CLIENT_CACHE) === "true")
     System.clearProperty("java.security.krb5.realm")
+    if (kdc !== null) {
+      kdc.stop()
+    }
     conf.remove(authType)
     UserGroupInformation.setConfiguration(SparkHadoopUtil.get.newConfiguration(conf))
     assert(!UserGroupInformation.isSecurityEnabled)
