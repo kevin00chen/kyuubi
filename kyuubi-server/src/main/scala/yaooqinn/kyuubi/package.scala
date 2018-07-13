@@ -31,14 +31,12 @@ package object kyuubi {
     private val unknown = "<unknown>"
     private val props = new Properties()
 
-    if (buildFileStream != null) {
-      try {
-        props.load(buildFileStream)
-      } catch {
-        case e: Exception => throw new ServiceException(e)
-      } finally {
-        Try(buildFileStream.close())
-      }
+    try {
+      props.load(buildFileStream)
+    } catch {
+      case e: Exception => throw new ServiceException(e)
+    } finally {
+      Try(buildFileStream.close())
     }
 
     val version: String = props.getProperty("kyuubi_version", unknown)

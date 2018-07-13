@@ -19,6 +19,7 @@ package yaooqinn.kyuubi.auth
 
 
 import java.io.{File, IOException}
+import java.net.InetAddress
 
 import org.apache.hadoop.hive.shims.ShimLoader
 import org.apache.hadoop.hive.thrift.HadoopThriftAuthBridge
@@ -30,13 +31,18 @@ import org.apache.spark.deploy.SparkHadoopUtil
 import org.apache.thrift.protocol.TBinaryProtocol
 import org.apache.thrift.transport.TSocket
 
+import yaooqinn.kyuubi.Logging
 import yaooqinn.kyuubi.auth.KerberosSaslHelper.CLIServiceProcessorFactory
 import yaooqinn.kyuubi.utils.ReflectUtils
 
-class KerberosTest extends SparkFunSuite {
+class KerberosTest extends SparkFunSuite with Logging {
 
+  val krb5Conf = "java.security.krb5.conf"
+  val hadoopAuth = "spark.hadoop.hadoop.security.authentication"
+  val kerberos = "KERBEROS"
   var kdc: MiniKdc = _
-  val baseDir = KyuubiSparkUtil.createTempDir(namePrefix = "kyuubi-kdc")
+  val baseDir: File = KyuubiSparkUtil.createTempDir(namePrefix = "kyuubi-kdc")
+  var conf: SparkConf = _
 
   override def beforeAll() {
     super.beforeAll()
@@ -54,10 +60,19 @@ class KerberosTest extends SparkFunSuite {
       case e: IOException =>
         throw new AssertionError("unable to create temporary directory: " + e.getMessage)
     }
+    val krb5Path = kdc.getKrb5conf.getAbsolutePath
+    info(krb5Path)
+    System.setProperty(krb5Conf, krb5Path)
+    conf = new SparkConf()
+    conf.set(KyuubiConf.AUTHENTICATION_METHOD.key, kerberos)
+    conf.set(hadoopAuth, kerberos)
   }
 
   override def afterAll() {
     super.afterAll()
+    conf.remove(hadoopAuth)
+    UserGroupInformation.setConfiguration(KyuubiSparkUtil.newConfiguration(conf))
+
     if (kdc != null) {
       kdc.stop()
     }
@@ -75,19 +90,16 @@ class KerberosTest extends SparkFunSuite {
       userName
     }
     val keytab = new File(baseDir, user + ".keytab")
-    val princ = user + "/localhost"
+    keytab.createNewFile()
+    val princ = user + "/" + InetAddress.getLocalHost.getHostName + "@" + getRealm
     kdc.createPrincipal(keytab, princ)
     (princ, keytab.getAbsolutePath)
   }
 
   ignore("kerberos sasl server exists") {
-    val (princ, keytab) = createRandomKeytab("alice")
-    val conf = new SparkConf()
-
-    conf.set(KyuubiConf.AUTHENTICATION_METHOD.key, "KERBEROS")
+    val (princ, keytab) = createRandomKeytab()
     conf.set(KyuubiSparkUtil.KEYTAB, keytab)
     conf.set(KyuubiSparkUtil.PRINCIPAL, princ)
-    conf.set("spark.hadoop.hadoop.security.authentication", "KERBEROS")
     val hadoopConf = SparkHadoopUtil.get.newConfiguration(conf)
     UserGroupInformation.setConfiguration(hadoopConf)
     KyuubiConf.getAllDefaults.foreach(c => conf.setIfMissing(c._1, c._2))
