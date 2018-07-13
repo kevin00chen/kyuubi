@@ -62,13 +62,13 @@ class KerberosTest extends SparkFunSuite {
     val krb5Path = kdc.getKrb5conf.getAbsolutePath
     System.setProperty(krb5Conf, krb5Path)
     conf = new SparkConf()
-    conf.set(KyuubiConf.AUTHENTICATION_METHOD.key, kerberos)
-    conf.set(hadoopAuth, kerberos)
+
   }
 
   override def afterAll() {
     super.afterAll()
     conf.remove(hadoopAuth)
+    conf.set(KyuubiConf.AUTHENTICATION_METHOD.key, "NONE")
     System.clearProperty(krb5Conf)
     UserGroupInformation.setConfiguration(KyuubiSparkUtil.newConfiguration(conf))
     if (kdc != null) {
@@ -96,6 +96,8 @@ class KerberosTest extends SparkFunSuite {
 
   ignore("kerberos sasl server exists") {
     val (princ, keytab) = createRandomKeytab()
+    conf.set(KyuubiConf.AUTHENTICATION_METHOD.key, kerberos)
+    conf.set(hadoopAuth, kerberos)
     conf.set(KyuubiSparkUtil.KEYTAB, keytab)
     conf.set(KyuubiSparkUtil.PRINCIPAL, princ)
     val hadoopConf = SparkHadoopUtil.get.newConfiguration(conf)
