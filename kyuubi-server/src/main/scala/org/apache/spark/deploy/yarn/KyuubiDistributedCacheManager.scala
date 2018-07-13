@@ -24,15 +24,13 @@ import scala.collection.mutable.{HashMap, Map}
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.{FileStatus, FileSystem, Path}
 import org.apache.hadoop.yarn.api.records.{LocalResource, LocalResourceType}
-import org.apache.spark.SparkConf
 
 import yaooqinn.kyuubi.Logging
 
 /** Client side methods to setup the Hadoop distributed cache */
 object KyuubiDistributedCacheManager extends Logging {
 
-  // Spark has a good impl to reuse but private, expose it here.
-  val cacheManager = new ClientDistributedCacheManager
+  private[this] val cacheManager = new ClientDistributedCacheManager
 
   /**
    * Add a resource to the list of distributed cache resources. This list can
@@ -48,7 +46,6 @@ object KyuubiDistributedCacheManager extends Logging {
    * @param resourceType LocalResourceType
    * @param link link presented in the distributed cache to the destination
    * @param statCache cache to store the file/directory stats
-   * @param appMasterOnly Whether to only add the resource to the app master
    */
   def addResource(
       fs: FileSystem,
@@ -57,16 +54,8 @@ object KyuubiDistributedCacheManager extends Logging {
       localResources: HashMap[String, LocalResource],
       resourceType: LocalResourceType,
       link: String,
-      statCache: Map[URI, FileStatus],
-      appMasterOnly: Boolean = true): Unit = {
+      statCache: Map[URI, FileStatus]): Unit = {
     cacheManager.addResource(fs, conf, destPath,
-      localResources, resourceType, link, statCache, appMasterOnly)
-  }
-
-  /**
-   * Writes down information about cached files needed in executors to the given configuration.
-   */
-  def updateConfiguration(conf: SparkConf): Unit = {
-    cacheManager.updateConfiguration(conf)
+      localResources, resourceType, link, statCache, true)
   }
 }

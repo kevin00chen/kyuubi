@@ -260,8 +260,6 @@ private[yarn] class KyuubiYarnClient(conf: SparkConf) extends Logging {
       destName = Some(SPARK_LIB_DIR))
     jarsArchive.delete()
 
-    KyuubiDistributedCacheManager.updateConfiguration(conf)
-
     val remoteConfArchivePath = new Path(appStagingDir, SPARK_CONF_ARCHIVE)
     val remoteFs = FileSystem.get(remoteConfArchivePath.toUri, hadoopConf)
     conf.set(KyuubiSparkUtil.CACHED_CONF_ARCHIVE, remoteConfArchivePath.toString)
