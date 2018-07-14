@@ -165,7 +165,7 @@ private[yarn] class KyuubiYarnClient(conf: SparkConf) extends Logging {
     appContext.setApplicationName(s"$KYUUBI_YARN_APP_NAME[$KYUUBI_VERSION]")
     appContext.setQueue(conf.get(KyuubiSparkUtil.QUEUE, YarnConfiguration.DEFAULT_QUEUE_NAME))
     appContext.setAMContainerSpec(containerContext)
-    appContext.setApplicationType(s"$KYUUBI_YARN_APP_NAME[${KyuubiSparkUtil.SPARK_VERSION}]")
+    appContext.setApplicationType(KYUUBI_YARN_APP_TYPE)
     conf.getOption(KyuubiSparkUtil.MAX_APP_ATTEMPTS) match {
       case Some(v) => appContext.setMaxAppAttempts(v.toInt)
       case None => debug(s"${KyuubiSparkUtil.MAX_APP_ATTEMPTS} is not set. " +
@@ -287,9 +287,6 @@ private[yarn] class KyuubiYarnClient(conf: SparkConf) extends Logging {
       }
     }
 
-    // SPARK-23630: during testing, Spark scripts filter out hadoop conf dirs so that user's
-    // environments do not interfere with tests. This allows a special env variable during
-    // tests so that custom conf dirs can be used by unit tests.
     val confDirs = Seq("HADOOP_CONF_DIR", "YARN_CONF_DIR")
 
     confDirs.foreach { envKey =>
@@ -358,7 +355,7 @@ private[yarn] class KyuubiYarnClient(conf: SparkConf) extends Logging {
       conf.getAll.foreach { case (k, v) =>
         props.setProperty(k, v)
       }
-      // Override spark.yarn.key to point to the location in distributed cache which will be used
+      // Override spark.yarn.keytab to point to the location in distributed cache which will be used
       // by AM.
       Option(keytabForAM).foreach { k => props.setProperty(KyuubiSparkUtil.KEYTAB, k) }
       confStream.putNextEntry(new ZipEntry(SPARK_CONF_FILE))

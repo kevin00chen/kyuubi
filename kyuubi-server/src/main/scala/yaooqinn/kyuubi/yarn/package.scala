@@ -28,6 +28,7 @@ package object yarn {
   type RESOURCES = HashMap[String, LocalResource]
 
   val KYUUBI_YARN_APP_NAME = "KYUUBI SERVER"
+  val KYUUBI_YARN_APP_TYPE = "KYUUBI"
   // Staging directory for any temporary jars or files
   val KYUUBI_STAGING: String = ".kyuubiStaging"
   // Staging directory is private! -> rwx--------

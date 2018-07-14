@@ -31,17 +31,18 @@ import org.apache.hadoop.yarn.conf.YarnConfiguration
 import org.apache.hadoop.yarn.conf.YarnConfiguration._
 import org.apache.hadoop.yarn.exceptions.ApplicationAttemptNotFoundException
 import org.apache.hadoop.yarn.util.ConverterUtils
-import org.apache.spark.{KyuubiSparkUtil, SparkConf}
+import org.apache.spark.{KyuubiConf, KyuubiSparkUtil, SparkConf}
 
 import yaooqinn.kyuubi.Logging
+import yaooqinn.kyuubi.ha.HighAvailabilityUtils
 import yaooqinn.kyuubi.server.KyuubiServer
-import yaooqinn.kyuubi.service.AbstractService
+import yaooqinn.kyuubi.service.CompositeService
 
-class KyuubiAppMaster private(args: AppMasterArguments, name: String) extends AbstractService(name)
+class KyuubiAppMaster private(args: AppMasterArguments, name: String) extends CompositeService(name)
   with Logging {
 
   def this(args: AppMasterArguments) = this(args, classOf[KyuubiAppMaster].getSimpleName)
-  private lazy val amClient = AMRMClient.createAMRMClient()
+  private lazy val amRMClient = AMRMClient.createAMRMClient()
 
   private[this] var yarnConf: YarnConfiguration = _
   private[this] var server: KyuubiServer = _
@@ -56,7 +57,7 @@ class KyuubiAppMaster private(args: AppMasterArguments, name: String) extends Ab
   private[this] val heartbeatTask = new Runnable {
     override def run(): Unit = {
       try {
-        amClient.allocate(0.1f)
+        amRMClient.allocate(0.1f)
         failureCount = 0
       } catch {
         case _: InterruptedException =>
@@ -78,20 +79,6 @@ class KyuubiAppMaster private(args: AppMasterArguments, name: String) extends Ab
 
   private[this] val executor = Executors.newSingleThreadScheduledExecutor(
       new ThreadFactoryBuilder().setDaemon(true).setNameFormat("AM-RM-Heartbeat" + "-%d").build())
-
-  private[this] def startKyuubiServer(): Unit = {
-    try {
-      server = KyuubiServer.startKyuubiServer()
-      val feService = server.feService
-      amClient.registerApplicationMaster(
-        feService.getServerIPAddress.getHostName,
-        feService.getPortNumber, "")
-    } catch {
-      case e: Exception =>
-        error("Error starting Kyuubi Server", e)
-        this.stop()
-    }
-  }
 
   private[this] def getAppAttemptId: ApplicationAttemptId = {
     val containerIdString = System.getenv(ApplicationConstants.Environment.CONTAINER_ID.name())
@@ -119,54 +106,79 @@ class KyuubiAppMaster private(args: AppMasterArguments, name: String) extends Ab
   private[this] def stop(stat: FinalApplicationStatus, msg: String): Unit = {
     amStatus = stat
     finalMsg = msg
-    amClient.stop()
+    amRMClient.stop()
     executor.shutdown()
-    if (server != null) {
-      server.stop()
-    }
     if (getAppAttemptId.getAttemptId >= amMaxAttempts) {
-      amClient.unregisterApplicationMaster(amStatus, finalMsg, "")
+      amRMClient.unregisterApplicationMaster(amStatus, finalMsg, "")
       cleanupStagingDir()
     }
-    System.exit(-1)
   }
 
   override def init(conf: SparkConf): Unit = {
-    KyuubiSparkUtil.getAndSetKyuubiFirstClassLoader
-    this.conf = conf
-    args.propertiesFile.map(KyuubiSparkUtil.getPropertiesFromFile) match {
-      case Some(props) => props.foreach { case (k, v) =>
-        conf.set(k, v)
-        sys.props(k) = v
+    try {
+      KyuubiSparkUtil.getAndSetKyuubiFirstClassLoader
+      this.conf = conf
+      args.propertiesFile.map(KyuubiSparkUtil.getPropertiesFromFile) match {
+        case Some(props) => props.foreach { case (k, v) =>
+          this.conf.set(k, v)
+          sys.props(k) = v
+        }
+        case _ =>
       }
-      case _ =>
+      KyuubiServer.setupCommonConfig(this.conf)
+      yarnConf = new YarnConfiguration(KyuubiSparkUtil.newConfiguration(this.conf))
+      amMaxAttempts = yarnConf.getInt(RM_AM_MAX_ATTEMPTS, DEFAULT_RM_AM_MAX_ATTEMPTS)
+      amRMClient.init(yarnConf)
+
+      server = new KyuubiServer()
+      addService(server)
+      super.init(conf)
+    } catch {
+      case e: Exception =>
+        val msg = "Error initializing Kyuubi Server: "
+        error(msg, e)
+        stop(FinalApplicationStatus.FAILED, msg + e.getMessage)
+    } finally {
+      KyuubiSparkUtil.addShutdownHook(() => this.stop())
     }
-    yarnConf = new YarnConfiguration(KyuubiSparkUtil.newConfiguration(conf))
-    amMaxAttempts = yarnConf.getInt(RM_AM_MAX_ATTEMPTS, DEFAULT_RM_AM_MAX_ATTEMPTS)
-    amClient.init(yarnConf)
-    super.init(conf)
-    KyuubiSparkUtil.addShutdownHook(() => this.stop())
   }
 
   override def start(): Unit = {
-    amClient.start()
-    startKyuubiServer()
-    val expiryInterval = yarnConf.getInt(RM_AM_EXPIRY_INTERVAL_MS, 120000)
-    interval = math.max(0, math.min(expiryInterval / 2, 3000))
-    executor.scheduleAtFixedRate(heartbeatTask, interval, interval, TimeUnit.MILLISECONDS)
-    super.start()
+    try {
+      amRMClient.start()
+      // TODO:(Kent) Add App tracking url
+      val feService = server.feService
+      amRMClient.registerApplicationMaster(
+        feService.getServerIPAddress.getHostName,
+        feService.getPortNumber, "")
+      val expiryInterval = yarnConf.getInt(RM_AM_EXPIRY_INTERVAL_MS, 120000)
+      interval = math.max(0, math.min(expiryInterval / 2, 3000))
+      executor.scheduleAtFixedRate(heartbeatTask, interval, interval, TimeUnit.MILLISECONDS)
+      super.start()
+      info(server.getName + " started!")
+      if (HighAvailabilityUtils.isSupportDynamicServiceDiscovery(conf)) {
+        info(s"HA mode: start to add this ${server.getName} instance to Zookeeper...")
+        HighAvailabilityUtils.addServerInstanceToZooKeeper(server)
+      }
+    } catch {
+      case e: Exception =>
+        val msg = "Error starting Kyuubi Server: "
+        error(msg, e)
+        stop(FinalApplicationStatus.FAILED, msg + e.getMessage)
+    }
   }
 
   override def stop(): Unit = {
     super.stop()
-    System.exit(0)
   }
 }
 
 object KyuubiAppMaster extends Logging {
 
   def main(args: Array[String]): Unit = {
+    KyuubiSparkUtil.initDaemon(logger)
     val conf = new SparkConf()
+    conf.set(KyuubiConf.FRONTEND_BIND_PORT.key, "0")
     val appMasterArgs = AppMasterArguments(args)
     val master = new KyuubiAppMaster(appMasterArgs)
     master.init(conf)

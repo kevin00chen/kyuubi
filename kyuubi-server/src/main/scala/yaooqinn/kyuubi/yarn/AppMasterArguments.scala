@@ -18,8 +18,6 @@
 package yaooqinn.kyuubi.yarn
 
 case class AppMasterArguments(args: Array[String]) {
-
-  var kyuubiClass: String = _
   var propertiesFile: Option[String] = _
 
   init(args)
