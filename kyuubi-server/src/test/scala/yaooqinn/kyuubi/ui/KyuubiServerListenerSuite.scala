@@ -21,8 +21,11 @@ import java.util.{Properties, UUID}
 
 import org.apache.spark.{KyuubiSparkUtil, SparkConf, SparkFunSuite}
 import org.apache.spark.scheduler.SparkListenerJobStart
+import org.mockito.Mockito.when
+import org.scalatest.mock.MockitoSugar
 
-class KyuubiServerListenerSuite extends SparkFunSuite {
+class KyuubiServerListenerSuite extends SparkFunSuite with MockitoSugar{
+  val ip = KyuubiSparkUtil.localHostName()
 
   test("kyuubi server listener") {
     val conf = new SparkConf(loadDefaults = true)
@@ -32,7 +35,6 @@ class KyuubiServerListenerSuite extends SparkFunSuite {
     assert(li.getSessionList.isEmpty)
     assert(li.getExecutionList.isEmpty)
 
-    val ip = KyuubiSparkUtil.localHostName()
     val sessionId = UUID.randomUUID().toString
     val user = KyuubiSparkUtil.getCurrentUserName
 
@@ -85,5 +87,37 @@ class KyuubiServerListenerSuite extends SparkFunSuite {
     assert(li.getExecutionList.head.finishTimestamp !== finishTimestamp1)
     assert(li.getExecutionList.head.state === ExecutionState.FINISHED)
     assert(li.getTotalRunning === -1)
+  }
+
+  test("on job start") {
+    val jobStart = mock[SparkListenerJobStart]
+
+    val props = new Properties()
+    val sessionId = UUID.randomUUID().toString
+    val statementId = UUID.randomUUID().toString
+    props.setProperty(KyuubiSparkUtil.getJobGroupIDKey, statementId)
+    when(jobStart.properties).thenReturn(props)
+    when(jobStart.jobId).thenReturn(1)
+    val conf = new SparkConf()
+    val li = new KyuubiServerListener(conf)
+    li.onSessionCreated(ip, sessionId)
+    assert(li.getSession(sessionId).get.userName === "UNKNOWN")
+    li.onStatementStart(statementId, sessionId, "show tables", statementId)
+    assert(li.getExecutionList.head.groupId === statementId)
+    li.onJobStart(jobStart)
+    assert(li.getExecutionList.head.jobId.contains("1"))
+
+    val jobStart2 = mock[SparkListenerJobStart]
+    when(jobStart2.properties).thenReturn(null)
+    when(jobStart2.jobId).thenReturn(2)
+    li.onJobStart(jobStart2)
+    assert(!li.getExecutionList.head.jobId.contains("2"))
+
+    val jobStart3 = mock[SparkListenerJobStart]
+    when(jobStart3.properties).thenReturn(new Properties())
+    when(jobStart3.jobId).thenReturn(3)
+    li.onJobStart(jobStart3)
+    assert(!li.getExecutionList.head.jobId.contains("3"))
+
   }
 }

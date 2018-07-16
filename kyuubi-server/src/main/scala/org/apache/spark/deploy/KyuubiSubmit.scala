@@ -206,14 +206,6 @@ object KyuubiSubmit extends Logging {
     (childClasspath, sysProps)
   }
 
-  private def runMain(
-      childClasspath: Seq[String],
-      sysProps: Map[String, String],
-      verbose: Boolean): Unit = {
-    // scalastyle:off println
-
-  }
-
   private def addJarToClasspath(localJar: String, loader: MutableURLClassLoader) {
     val uri = Utils.resolveURI(localJar)
     uri.getScheme match {

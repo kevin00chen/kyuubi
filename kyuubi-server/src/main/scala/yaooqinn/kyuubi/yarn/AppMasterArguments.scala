@@ -17,12 +17,15 @@
 
 package yaooqinn.kyuubi.yarn
 
-case class AppMasterArguments(args: Array[String]) {
+import yaooqinn.kyuubi.Logging
+
+case class AppMasterArguments(args: Array[String]) extends Logging {
   var propertiesFile: Option[String] = _
 
   init(args)
 
   private[this] def init(args: Array[String]): Unit = {
+    require(args != null, "Arguments for Kyuubi Application Master can not be null")
     var tmp = args.toList
 
     while (tmp.nonEmpty) {
@@ -31,25 +34,17 @@ case class AppMasterArguments(args: Array[String]) {
           propertiesFile = Some(value)
           tmp = tail
         case _ =>
-          printUsageAndExit(tmp)
-
+          val msg = "Unknown/unsupported param " + tmp
+          val usage =
+            """
+              |Usage: yaooqinn.kyuubi.yarn.KyuubiAppMaster [options]
+              |Options:
+              | --properties-file FILE Path to a custom Spark properties file.
+            """.stripMargin
+          error(msg)
+          info(usage)
+          throw new IllegalArgumentException(msg)
       }
     }
   }
-
-  def printUsageAndExit(unknownParam: Any = null, exitCode: Int = 1) {
-    // scalastyle:off println
-    if (unknownParam != null) {
-      System.err.println("Unknown/unsupported param " + unknownParam)
-    }
-    System.err.println(
-      """
-        |Usage: yaooqinn.kyuubi.yarn.KyuubiAppMaster [options]
-        |Options:
-        |  --properties-file FILE Path to a custom Spark properties file.
-      """.stripMargin)
-    // scalastyle:on println
-    System.exit(exitCode)
-  }
-
 }

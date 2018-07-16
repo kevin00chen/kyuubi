@@ -112,6 +112,7 @@ class KyuubiAppMaster private(args: AppMasterArguments, name: String) extends Co
       amRMClient.unregisterApplicationMaster(amStatus, finalMsg, "")
       cleanupStagingDir()
     }
+    System.exit(-1)
   }
 
   override def init(conf: SparkConf): Unit = {
@@ -176,12 +177,19 @@ class KyuubiAppMaster private(args: AppMasterArguments, name: String) extends Co
 object KyuubiAppMaster extends Logging {
 
   def main(args: Array[String]): Unit = {
-    KyuubiSparkUtil.initDaemon(logger)
-    val conf = new SparkConf()
-    conf.set(KyuubiConf.FRONTEND_BIND_PORT.key, "0")
-    val appMasterArgs = AppMasterArguments(args)
-    val master = new KyuubiAppMaster(appMasterArgs)
-    master.init(conf)
-    master.start()
+
+    try {
+      KyuubiSparkUtil.initDaemon(logger)
+      val conf = new SparkConf()
+      conf.set(KyuubiConf.FRONTEND_BIND_PORT.key, "0")
+      val appMasterArgs = AppMasterArguments(args)
+      val master = new KyuubiAppMaster(appMasterArgs)
+      master.init(conf)
+      master.start()
+    } catch {
+      case e: Exception =>
+        error("Uncaught exception: ", e)
+        System.exit(-1)
+    }
   }
 }
