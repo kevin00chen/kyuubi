@@ -21,6 +21,7 @@ import java.util.{Properties, UUID}
 
 import org.apache.spark.{KyuubiSparkUtil, SparkConf, SparkFunSuite}
 import org.apache.spark.scheduler.SparkListenerJobStart
+import org.apache.spark.sql.internal.SQLConf
 import org.mockito.Mockito.when
 import org.scalatest.mock.MockitoSugar
 
@@ -118,6 +119,102 @@ class KyuubiServerListenerSuite extends SparkFunSuite with MockitoSugar{
     when(jobStart3.jobId).thenReturn(3)
     li.onJobStart(jobStart3)
     assert(!li.getExecutionList.head.jobId.contains("3"))
+  }
+
+  test("trim session if necessary") {
+    val conf = new SparkConf().set(SQLConf.THRIFTSERVER_UI_SESSION_LIMIT.key, "1")
+    val li = new KyuubiServerListener(conf)
+    val sessionId = UUID.randomUUID().toString
+    li.onSessionCreated(ip, sessionId)
+    val sessionId2 = UUID.randomUUID().toString
+    li.onSessionCreated(ip, sessionId2)
+    val sessionId3 = UUID.randomUUID().toString
+    li.onSessionCreated(ip, sessionId3)
+    // trim nothing when finish time 0
+    assert(li.getSessionList.forall(_.finishTimestamp === 0L))
+    assert(li.getSessionList.size === 3)
+
+    // trim id 1
+    li.onSessionClosed(sessionId)
+    assert(li.getSessionList.forall(_.finishTimestamp === 0L))
+    assert(li.getSessionList.size === 2)
+    // trim id 2
+    li.onSessionClosed(sessionId2)
+    assert(li.getSessionList.size === 1)
+    // remain id 3, when lower bound meets
+    li.onSessionClosed(sessionId3)
+    assert(li.getSessionList.size === 1)
+    assert(li.getSessionList.forall(_.finishTimestamp !== 0L))
+
+    // trim id 3
+    val sessionId4 = UUID.randomUUID().toString
+    li.onSessionCreated(ip, sessionId4)
+    assert(li.getSessionList.size === 1)
+    assert(li.getSessionList.forall(_.finishTimestamp === 0L))
+
+
+    conf.set(SQLConf.THRIFTSERVER_UI_SESSION_LIMIT.key, "20")
+    val li2 = new KyuubiServerListener(conf)
+    (0 until 30).foreach(p => li2.onSessionCreated(ip, p.toString))
+    li2.getSessionList.take(5).foreach(_.finishTimestamp = 1)
+    li2.onSessionClosed("29")
+    assert(li2.getSessionList.size === 28)
+    li2.onSessionClosed("28")
+    assert(li2.getSessionList.size === 26)
+
+  }
+
+  test("trim execution if necessary") {
+    val conf = new SparkConf().set(SQLConf.THRIFTSERVER_UI_STATEMENT_LIMIT.key, "1")
+    val li = new KyuubiServerListener(conf)
+    val sessionId = UUID.randomUUID().toString
+    li.onSessionCreated(ip, sessionId)
+    val statementId = UUID.randomUUID().toString
+    val statement = "show tables"
+    li.onStatementStart(statementId, sessionId, statement, statementId)
+    assert(li.getExecutionList.size === 1)
+    assert(li.getExecutionList.forall(_.finishTimestamp === 0L))
+    val statementId2 = UUID.randomUUID().toString
+    li.onStatementStart(statementId2, sessionId, statement, statementId2)
+    assert(li.getExecutionList.size === 2)
+    assert(li.getExecutionList.forall(_.finishTimestamp === 0L))
+    val statementId3 = UUID.randomUUID().toString
+    li.onStatementStart(statementId3, sessionId, statement, statementId3)
+    assert(li.getExecutionList.size === 3)
+    assert(li.getExecutionList.forall(_.finishTimestamp === 0L))
+
+    // trim id 1
+    li.onStatementFinish(statementId)
+    assert(li.getExecutionList.size === 2)
+    assert(li.getExecutionList.forall(_.finishTimestamp === 0L))
+    // trim id 2
+    li.onStatementFinish(statementId2)
+    assert(li.getExecutionList.size === 1)
+    assert(li.getExecutionList.forall(_.finishTimestamp === 0L))
+    // remain id 3, when lower bound meets
+    li.onStatementFinish(statementId3)
+    assert(li.getExecutionList.size === 1)
+    assert(li.getExecutionList.forall(_.finishTimestamp !== 0L))
+    // trim id 3
+    val statementId4 = UUID.randomUUID().toString
+    li.onStatementStart(statementId4, sessionId, statement, statementId4)
+    assert(li.getExecutionList.size === 1)
+    assert(li.getExecutionList.forall(_.finishTimestamp === 0L))
+
+    conf.set(SQLConf.THRIFTSERVER_UI_STATEMENT_LIMIT.key, "20")
+    val li2 = new KyuubiServerListener(conf)
+    li2.onSessionCreated(ip, sessionId)
+
+    (0 until 30).foreach { id =>
+      li2.onStatementStart(id.toString, sessionId, statement, id.toString)
+    }
+    li2.getExecutionList.take(5).foreach(_.finishTimestamp = 1)
+    // trim 2 statement
+    li2.onStatementFinish("29")
+    assert(li2.getExecutionList.size === 28)
+
+    li2.onStatementFinish("28")
+    assert(li2.getExecutionList.size === 26)
 
   }
 }
