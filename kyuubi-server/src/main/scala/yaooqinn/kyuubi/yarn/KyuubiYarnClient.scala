@@ -183,7 +183,7 @@ private[yarn] class KyuubiYarnClient(conf: SparkConf) extends Logging {
   private[this] def setupLaunchEnv(): ENV = {
     info("Setting up the launch environment for our Kyuubi Server container")
     val env = new ENV
-    populateClasspath(hadoopConf, conf, env)
+    populateClasspath(hadoopConf, env)
     env("KYUUBI_YARN_STAGING_DIR") = appStagingDir.toString
     val amEnvPrefix = "spark.yarn.appMasterEnv."
     conf.getAll
@@ -370,28 +370,12 @@ private[yarn] class KyuubiYarnClient(conf: SparkConf) extends Logging {
   }
 
   /**
-   * Given a local URI, resolve it and return a qualified local path that corresponds to the URI.
-   * This is used for preparing local resources to be included in the container launch context.
-   */
-  private def getQualifiedLocalPath(localURI: URI, hadoopConf: Configuration): Path = {
-    val qualifiedURI =
-      if (localURI.getScheme == null) {
-        // If not specified, assume this is in the local filesystem to keep the behavior
-        // consistent with that of Hadoop
-        new URI(FileSystem.getLocal(hadoopConf).makeQualified(new Path(localURI)).toString)
-      } else {
-        localURI
-      }
-    new Path(qualifiedURI)
-  }
-
-  /**
    * Copy the given file to a remote file system (e.g. HDFS) if needed.
    * The file is only copied if the source and destination file systems are different or the source
    * scheme is "file". This is used for preparing resources for launching the ApplicationMaster
    * container. Exposed for testing.
    */
-  def copyFileToRemote(destDir: Path, srcPath: Path,
+  private[this] def copyFileToRemote(destDir: Path, srcPath: Path,
       cache: Map[URI, Path], destName: Option[String] = None): Path = {
     val destFs = destDir.getFileSystem(hadoopConf)
     val srcFs = srcPath.getFileSystem(hadoopConf)
@@ -412,6 +396,23 @@ private[yarn] class KyuubiYarnClient(conf: SparkConf) extends Logging {
 }
 
 object KyuubiYarnClient {
+
+  /**
+   * Given a local URI, resolve it and return a qualified local path that corresponds to the URI.
+   * This is used for preparing local resources to be included in the container launch context.
+   */
+  def getQualifiedLocalPath(localURI: URI, hadoopConf: Configuration): Path = {
+    val qualifiedURI =
+      if (localURI.getScheme == null) {
+        // If not specified, assume this is in the local filesystem to keep the behavior
+        // consistent with that of Hadoop
+        new URI(FileSystem.getLocal(hadoopConf).makeQualified(new Path(localURI)).toString)
+      } else {
+        localURI
+      }
+    new Path(qualifiedURI)
+  }
+
   /**
    * Joins all the path components using [[Path.SEPARATOR]].
    */
@@ -440,10 +441,9 @@ object KyuubiYarnClient {
   def addClasspathEntry(path: String, env: ENV): Unit =
     addPathToEnvironment(env, Environment.CLASSPATH.name, path)
 
-  def populateClasspath(
-      conf: Configuration, sparkConf: SparkConf, env: ENV): Unit = {
+  def populateClasspath(conf: Configuration, env: ENV): Unit = {
     addClasspathEntry(Environment.PWD.$$(), env)
-    addClasspathEntry(Environment.PWD.$$() + Path.SEPARATOR + SPARK_CONF_DIR, env)
+    addClasspathEntry(buildPath(Environment.PWD.$$(), SPARK_CONF_DIR), env)
     addClasspathEntry(buildPath(Environment.PWD.$$(), KYUUBI_JAR_NAME), env)
     addClasspathEntry(buildPath(Environment.PWD.$$(), SPARK_LIB_DIR, "*"), env)
     populateHadoopClasspath(conf, env)
